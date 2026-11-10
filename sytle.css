@@ -1,1 +1,136 @@
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
+// Variáveis do Jogo
+let frames = 0;
+let pontos = 0;
+let vidas = 3;
+let estadoJogo = "jogando"; // "jogando", "vitoria", "derrota"
+
+// O nosso Mago
+const mago = {
+    x: 50,
+    y: 300,
+    largura: 30,
+    altura: 40,
+    velocidadeY: 0,
+    gravidade: 0.6,
+    forcaPulo: -10,
+    velocidadeX: 0,
+    movimento: 5,
+    noChao: false,
+    
+    desenhar() {
+        // Corpo do mago (Roxo)
+        ctx.fillStyle = "purple";
+        ctx.fillRect(this.x, this.y, this.largura, this.altura);
+        
+        // Asa quebrada arrastando (Cinza escuro)
+        ctx.fillStyle = "#555";
+        ctx.fillRect(this.x - 10, this.y + 20, 15, 20);
+    },
+    
+    atualizar() {
+        this.velocidadeY += this.gravidade;
+        this.y += this.velocidadeY;
+        this.x += this.velocidadeX;
+
+        // Colisão com o chão da tela
+        if (this.y + this.altura >= canvas.height) {
+            this.y = canvas.height - this.altura;
+            this.velocidadeY = 0;
+            this.noChao = true;
+        }
+    }
+};
+
+// Plataformas do bosque
+const plataformas = [
+    { x: 150, y: 320, w: 100, h: 10 },
+    { x: 350, y: 250, w: 100, h: 10 },
+    { x: 550, y: 180, w: 100, h: 10 }
+];
+
+// Grimório Mágico (Nossa "Moeda")
+let grimorio = { x: 380, y: 210, w: 20, h: 20, coletado: false };
+
+// Controles (Setas / WASD e Espaço)
+document.addEventListener("keydown", (e) => {
+    if ((e.code === "ArrowLeft" || e.code === "KeyA")) mago.velocidadeX = -mago.movimento;
+    if ((e.code === "ArrowRight" || e.code === "KeyD")) mago.velocidadeX = mago.movimento;
+    if ((e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && mago.noChao) {
+        mago.velocidadeY = mago.forcaPulo;
+        mago.noChao = false;
+    }
+});
+
+document.addEventListener("keyup", (e) => {
+    if (e.code === "ArrowLeft" || e.code === "KeyA" || e.code === "ArrowRight" || e.code === "KeyD") {
+        mago.velocidadeX = 0;
+    }
+});
+
+// Loop principal do Jogo
+function loop() {
+    // Limpa a tela
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (estadoJogo === "jogando") {
+        mago.atualizar();
+
+        // Desenha Plataformas (Troncos queimados)
+        ctx.fillStyle = "#3e2723";
+        plataformas.forEach(plat => {
+            ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+            
+            // Colisão do mago com as plataformas (apenas caindo)
+            if (mago.velocidadeY > 0 && 
+                mago.x < plat.x + plat.w && mago.x + mago.largura > plat.x &&
+                mago.y + mago.altura >= plat.y && mago.y + mago.altura <= plat.y + 15) {
+                mago.y = plat.y - mago.altura;
+                mago.velocidadeY = 0;
+                mago.noChao = true;
+            }
+        });
+
+        // Desenha Grimório
+        if (!grimorio.coletado) {
+            ctx.fillStyle = "gold";
+            ctx.fillRect(grimorio.x, grimorio.y, grimorio.w, grimorio.h);
+            
+            // Colisão para coletar o grimório
+            if (mago.x < grimorio.x + grimorio.w && mago.x + mago.largura > grimorio.x &&
+                mago.y < grimorio.y + grimorio.h && mago.y + mago.altura > grimorio.y) {
+                grimorio.coletado = true;
+                pontos += 10;
+                estadoJogo = "vitoria"; // Ganha o jogo ao pegar o livro
+            }
+        }
+
+        mago.desenhar();
+
+        // Desenha o placar
+        ctx.fillStyle = "white";
+        ctx.font = "20px Arial";
+        ctx.fillText(`Pontos: ${pontos} | Vidas: ${vidas}`, 10, 30);
+    } 
+    else if (estadoJogo === "vitoria") {
+        ctx.fillStyle = "white";
+        ctx.font = "40px Arial";
+        ctx.fillText("Grimório Obtido! Você Venceu!", 150, 200);
+    }
+
+    requestAnimationFrame(loop);
+}
+
+// Botão de Reiniciar
+function reiniciarJogo() {
+    mago.x = 50;
+    mago.y = 300;
+    pontos = 0;
+    grimorio.coletado = false;
+    estadoJogo = "jogando";
+}
+
+// Inicia o jogo
+loop();
