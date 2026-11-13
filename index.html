@@ -1,466 +1,103 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mago da Floresta - Plataforma 2D</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas" width="960" height="540"></canvas>
 
-body {
-  background: #05050a;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  color: #fff;
-  overflow: hidden;
-}
+    <!-- Menu Principal (só aparece antes de jogar) -->
+    <div id="mainMenu">
+      <div class="menu-panel">
+        <h1 class="game-title">Mago da Floresta</h1>
+        <p class="subtitle">Uma aventura de plataforma mágica</p>
 
-#game-container {
-  position: relative;
-  width: 960px;
-  height: 540px;
-  box-shadow: 0 0 50px rgba(0, 40, 80, 0.55);
-  border: 3px solid #1e3a5f;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #000;
-}
+        <div class="menu-section">
+          <h2>Dificuldade</h2>
+          <div class="diff-buttons">
+            <button class="diff-btn selected" data-diff="easy">Fácil</button>
+            <button class="diff-btn" data-diff="normal">Normal</button>
+            <button class="diff-btn" data-diff="hard">Difícil</button>
+          </div>
+          <p id="diffDesc" class="diff-desc">Mais vidas, inimigos mais fracos, mais poções.</p>
+        </div>
 
-#gameCanvas {
-  display: block;
-  width: 960px;
-  height: 540px;
-  image-rendering: pixelated;
-}
+        <button id="startBtn" class="start-btn">▶ Jogar</button>
+        <button id="continueBtn" class="continue-btn hidden" type="button">↩ Continuar</button>
 
-/* ========== MENU PRINCIPAL ========== */
-#mainMenu {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(165deg, #0b1220 0%, #132238 45%, #0a1525 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
+        <div class="menu-links">
+          <button id="recordsBtn" class="link-btn" type="button">Recordes</button>
+          <button id="controlsBtn" class="link-btn" type="button">Controles</button>
+        </div>
+      </div>
 
-#mainMenu.hidden {
-  display: none;
-}
+      <!-- Painel de recordes (oculto por padrão) -->
+      <div id="recordsPanel" class="sub-panel hidden">
+        <h3>Recordes</h3>
+        <div id="highScores">
+          <p>Fácil: <span id="hsEasy">0</span></p>
+          <p>Normal: <span id="hsNormal">0</span></p>
+          <p>Difícil: <span id="hsHard">0</span></p>
+        </div>
+        <p class="save-meta">Partidas: <span id="gamesPlayed">0</span> · Vitórias: <span id="gamesWon">0</span></p>
+        <div id="recentRuns" class="recent-runs"></div>
+        <button id="clearSaveBtn" class="clear-save-btn" type="button">Apagar save</button>
+        <button id="closeRecordsBtn" class="link-btn" type="button">Voltar</button>
+      </div>
 
-.menu-panel {
-  text-align: center;
-  padding: 28px 40px;
-  max-width: 520px;
-}
+      <!-- Painel de controles (oculto por padrão) -->
+      <div id="controlsPanel" class="sub-panel hidden">
+        <h3>Controles</h3>
+        <ul class="controls-list">
+          <li><b>WASD / Setas</b> — Andar</li>
+          <li><b>Espaço</b> — Pular</li>
+          <li><b>J / F</b> — Bastão</li>
+          <li><b>Q</b> — Farpas Mentais</li>
+          <li><b>E</b> — Braços de Hadar</li>
+          <li><b>1 / H</b> — Usar poção</li>
+          <li><b>P</b> — Salvar progresso</li>
+        </ul>
+        <button id="closeControlsBtn" class="link-btn" type="button">Voltar</button>
+      </div>
+    </div>
 
-.game-title {
-  font-size: 48px;
-  font-weight: 800;
-  background: linear-gradient(90deg, #7dd3fc, #c4b5fd, #f0abfc);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 6px;
-  letter-spacing: 1px;
-}
+    <!-- HUD (só durante o jogo) -->
+    <div id="hud" class="hidden">
+      <div id="score">Pontos: <span id="scoreValue">0</span></div>
+      <div id="lives">Vidas: <span id="livesValue">3</span></div>
+      <div id="inventory">
+        <span class="inv-item">🧪 Poções: <span id="potionCount">0</span></span>
+      </div>
+      <div id="magic">Magia: Farpas Mentais (Q)</div>
+    </div>
 
-.subtitle {
-  color: #94a3b8;
-  font-size: 15px;
-  margin-bottom: 28px;
-}
+    <!-- Tutorial / Mensagens -->
+    <div id="messageBox" class="hidden"></div>
 
-.menu-section {
-  margin-bottom: 22px;
-}
+    <!-- Leitura do bilhete -->
+    <div id="noteOverlay" class="hidden">
+      <div id="notePaper">
+        <h3>Bilhete antigo</h3>
+        <p id="noteText"></p>
+        <button id="closeNoteBtn">Continuar</button>
+      </div>
+    </div>
 
-.menu-section h2 {
-  font-size: 14px;
-  color: #94a3b8;
-  margin-bottom: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
+    <!-- Telas de fim -->
+    <div id="overlay" class="hidden">
+      <div id="endScreen">
+        <h1 id="endTitle"></h1>
+        <p id="endMessage"></p>
+        <button id="restartBtn">Jogar Novamente</button>
+        <button id="menuBtn" class="menu-back-btn">Menu Principal</button>
+      </div>
+    </div>
+  </div>
 
-.diff-buttons {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-bottom: 8px;
-}
-
-.diff-btn {
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 2px solid #334155;
-  padding: 9px 20px;
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.diff-btn:hover {
-  border-color: #60a5fa;
-  background: #1e3a5f;
-}
-
-.diff-btn.selected {
-  background: linear-gradient(180deg, #3b82f6, #1d4ed8);
-  border-color: #93c5fd;
-  color: #fff;
-  box-shadow: 0 0 14px rgba(59, 130, 246, 0.35);
-}
-
-.diff-desc {
-  font-size: 12px;
-  color: #64748b;
-  min-height: 18px;
-}
-
-.start-btn {
-  background: linear-gradient(180deg, #22c55e, #16a34a);
-  color: white;
-  border: none;
-  padding: 14px 52px;
-  font-size: 20px;
-  font-weight: 700;
-  border-radius: 10px;
-  cursor: pointer;
-  box-shadow: 0 4px 0 #15803d;
-  transition: transform 0.12s, box-shadow 0.12s;
-  margin-bottom: 12px;
-  display: block;
-  width: 100%;
-  max-width: 280px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.start-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 0 #15803d;
-}
-
-.start-btn:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #15803d;
-}
-
-.continue-btn {
-  background: linear-gradient(180deg, #6366f1, #4f46e5);
-  color: white;
-  border: none;
-  padding: 11px 36px;
-  font-size: 15px;
-  font-weight: 700;
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: 0 3px 0 #3730a3;
-  margin-bottom: 18px;
-  display: block;
-  width: 100%;
-  max-width: 280px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.continue-btn.hidden {
-  display: none;
-}
-
-.menu-links {
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  margin-top: 8px;
-}
-
-.link-btn {
-  background: transparent;
-  color: #94a3b8;
-  border: 1px solid #334155;
-  padding: 7px 16px;
-  font-size: 13px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.link-btn:hover {
-  color: #e2e8f0;
-  border-color: #64748b;
-  background: rgba(255,255,255,0.04);
-}
-
-/* Sub-painéis (recordes / controles) */
-.sub-panel {
-  position: absolute;
-  inset: 0;
-  background: rgba(8, 12, 22, 0.96);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 60;
-  padding: 24px;
-  text-align: center;
-}
-
-.sub-panel.hidden {
-  display: none;
-}
-
-.sub-panel h3 {
-  font-size: 22px;
-  margin-bottom: 16px;
-  color: #e2e8f0;
-}
-
-#highScores {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 16px;
-  color: #e2e8f0;
-  margin-bottom: 12px;
-}
-
-#highScores span {
-  color: #fbbf24;
-  font-weight: 700;
-}
-
-.save-meta {
-  font-size: 13px;
-  color: #64748b;
-  margin-bottom: 10px;
-}
-
-.recent-runs {
-  font-size: 12px;
-  color: #94a3b8;
-  text-align: left;
-  max-height: 90px;
-  overflow-y: auto;
-  margin-bottom: 14px;
-  line-height: 1.45;
-  min-width: 280px;
-}
-
-.recent-runs .run-line {
-  padding: 2px 0;
-  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
-}
-
-.recent-runs .run-win { color: #86efac; }
-.recent-runs .run-loss { color: #fca5a5; }
-
-.clear-save-btn {
-  background: transparent;
-  color: #94a3b8;
-  border: 1px solid #475569;
-  padding: 6px 14px;
-  font-size: 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-bottom: 12px;
-}
-
-.clear-save-btn:hover {
-  color: #f87171;
-  border-color: #f87171;
-}
-
-.controls-list {
-  list-style: none;
-  text-align: left;
-  font-size: 15px;
-  color: #cbd5e1;
-  line-height: 1.8;
-  margin-bottom: 18px;
-}
-
-.controls-list b {
-  color: #7dd3fc;
-  display: inline-block;
-  min-width: 110px;
-}
-
-/* HUD */
-#hud {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: space-between;
-  font-size: 14px;
-  font-weight: 700;
-  text-shadow: 2px 2px 0 #000;
-  pointer-events: none;
-  z-index: 10;
-}
-
-#score, #lives, #magic, #inventory {
-  background: rgba(0, 0, 0, 0.55);
-  padding: 5px 11px;
-  border-radius: 6px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  white-space: nowrap;
-}
-
-#magic { color: #a0e0ff; }
-.inv-item { color: #86efac; }
-#hud.hidden { display: none; }
-
-/* Mensagens */
-#messageBox {
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(10, 20, 40, 0.94);
-  border: 3px solid #4a90d9;
-  border-radius: 10px;
-  padding: 12px 24px;
-  max-width: 700px;
-  text-align: center;
-  font-size: 15px;
-  line-height: 1.45;
-  white-space: pre-line;
-  z-index: 20;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  transition: opacity 0.3s;
-}
-
-#messageBox.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* Bilhete */
-#noteOverlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 40;
-}
-
-#noteOverlay.hidden { display: none; }
-
-#notePaper {
-  background: linear-gradient(180deg, #f5e6c8, #e8d5a8);
-  color: #3e2723;
-  border: 4px solid #a1887f;
-  border-radius: 4px;
-  padding: 28px 36px;
-  max-width: 420px;
-  text-align: center;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
-}
-
-#notePaper h3 {
-  font-family: Georgia, serif;
-  font-size: 22px;
-  margin-bottom: 14px;
-  color: #5d4037;
-}
-
-#notePaper p {
-  font-family: Georgia, serif;
-  font-size: 16px;
-  line-height: 1.55;
-  margin-bottom: 20px;
-  white-space: pre-line;
-}
-
-#closeNoteBtn {
-  background: #6d4c41;
-  color: #f5e6c8;
-  border: none;
-  padding: 10px 28px;
-  font-size: 15px;
-  font-weight: 700;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-#closeNoteBtn:hover {
-  background: #5d4037;
-}
-
-/* Overlay fim */
-#overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.78);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 30;
-}
-
-#overlay.hidden { display: none; }
-
-#endScreen {
-  background: linear-gradient(145deg, #1a2a4a, #0d1525);
-  border: 4px solid #4a90d9;
-  border-radius: 16px;
-  padding: 36px 50px;
-  text-align: center;
-  box-shadow: 0 0 40px rgba(74, 144, 217, 0.35);
-}
-
-#endTitle {
-  font-size: 40px;
-  margin-bottom: 14px;
-  text-shadow: 0 0 12px rgba(100, 180, 255, 0.5);
-}
-
-#endMessage {
-  font-size: 17px;
-  margin-bottom: 24px;
-  color: #c0d8f0;
-  line-height: 1.55;
-  white-space: pre-line;
-}
-
-#restartBtn {
-  background: linear-gradient(180deg, #3a7bd5, #2a5a9e);
-  color: white;
-  border: none;
-  padding: 12px 32px;
-  font-size: 18px;
-  font-weight: 700;
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: 0 4px 0 #1a3a6e;
-  transition: transform 0.15s;
-}
-
-#restartBtn:hover {
-  transform: translateY(-2px);
-}
-
-.menu-back-btn {
-  background: linear-gradient(180deg, #475569, #334155);
-  color: white;
-  border: none;
-  padding: 11px 24px;
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-top: 10px;
-  margin-left: 8px;
-  box-shadow: 0 3px 0 #1e293b;
-}
+  <script src="script.js"></script>
+</body>
+</html>
