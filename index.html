@@ -1,23 +1,75 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <title>Mago no Bosque Devastado</title>
-    <!-- Aqui nós conectamos nosso arquivo de estilos CSS -->
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mago da Floresta - Plataforma 2D</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Mago no Bosque Devastado</h1>
-    <p>Use WASD ou Setas para mover. Espaço para pular.</p>
-    
-    <!-- O Canvas é a nossa tela de desenho para o jogo -->
-    <canvas id="gameCanvas" width="800" height="400"></canvas>
-    
-    <div>
-        <button id="btnReiniciar" onclick="reiniciarJogo()">Reiniciar Jogo</button>
+  <div id="game-container">
+    <canvas id="gameCanvas" width="960" height="540"></canvas>
+
+    <!-- Menu Principal -->
+    <div id="mainMenu">
+      <h1 class="game-title">Mago da Floresta</h1>
+      <p class="subtitle">Uma aventura de plataforma mágica</p>
+
+      <div class="menu-section">
+        <h2>Dificuldade</h2>
+        <div class="diff-buttons">
+          <button class="diff-btn selected" data-diff="easy">Fácil</button>
+          <button class="diff-btn" data-diff="normal">Normal</button>
+          <button class="diff-btn" data-diff="hard">Difícil</button>
+        </div>
+        <p id="diffDesc" class="diff-desc">Mais vidas, inimigos mais fracos, mais poções.</p>
+      </div>
+
+      <button id="startBtn" class="start-btn">▶ Começar Aventura</button>
+      <button id="continueBtn" class="continue-btn hidden" type="button">↩ Continuar Progresso</button>
+
+      <div class="save-panel">
+        <h3>Recordes</h3>
+        <div id="highScores">
+          <p>Fácil: <span id="hsEasy">0</span></p>
+          <p>Normal: <span id="hsNormal">0</span></p>
+          <p>Difícil: <span id="hsHard">0</span></p>
+        </div>
+        <p class="save-meta">Partidas: <span id="gamesPlayed">0</span> · Vitórias: <span id="gamesWon">0</span></p>
+        <p class="save-meta save-engine">Save: localStorage + IndexedDB</p>
+        <div id="recentRuns" class="recent-runs"></div>
+        <button id="clearSaveBtn" class="clear-save-btn" type="button">Apagar save</button>
+      </div>
+
+      <div class="controls-info">
+        <p><b>Controles:</b> WASD / Setas · Espaço = Pular · J/F = Bastão · Q = Farpas Mentais · E = Braços de Hadar · 1 ou H = Poção · P = Salvar progresso</p>
+      </div>
     </div>
 
-    <!-- Aqui nós conectamos nosso arquivo de lógica JavaScript -->
-    <script src="script.js"></script>
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div id="score">Pontos: <span id="scoreValue">0</span></div>
+      <div id="lives">Vidas: <span id="livesValue">3</span></div>
+      <div id="inventory">
+        <span class="inv-item">🧪 Poções: <span id="potionCount">0</span></span>
+      </div>
+      <div id="magic">Magia: Farpas Mentais (Q)</div>
+    </div>
+
+    <!-- Tutorial / Mensagens -->
+    <div id="messageBox" class="hidden"></div>
+
+    <!-- Telas de fim -->
+    <div id="overlay" class="hidden">
+      <div id="endScreen">
+        <h1 id="endTitle"></h1>
+        <p id="endMessage"></p>
+        <button id="restartBtn">Jogar Novamente</button>
+        <button id="menuBtn" class="menu-back-btn">Menu Principal</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
