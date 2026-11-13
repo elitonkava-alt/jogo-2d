@@ -833,6 +833,7 @@ function spawnSkeletons() {
       patrolLeft: positions[i] - 80,
       patrolRight: positions[i] + 80,
       hp: Math.max(1, Math.round(baseHp * d.enemyHpMult)),
+      maxHp: Math.max(1, Math.round(baseHp * d.enemyHpMult)),
       invuln: 0,
       attackTimer: 0,
       attackCooldown: 0,
@@ -911,17 +912,17 @@ const hobgoblin = {
   maxFall: 12,
   onGround: false,
   facing: -1,
-  // IA
-  state: 'patrol', // patrol | chase | attack | stunned
+  state: 'patrol',
   patrolLeft: 1400,
   patrolRight: 1850,
   attackRange: 55,
   attackTimer: 0,
   attackCooldown: 0,
   stunTimer: 0,
-  // Dano
   damageCooldown: 0,
-  // Animação
+  invuln: 0,
+  hp: 8,
+  maxHp: 8,
   animFrame: 0,
   animTimer: 0,
   alive: true
@@ -1129,6 +1130,9 @@ function drawParticles() {
 // ------------------ Funções de atualização ------------------
 function updatePlayer() {
   if (gameState !== 'playing' && gameState !== 'ash') return;
+  // Pausa enquanto lê o bilhete
+  const noteOv = document.getElementById('noteOverlay');
+  if (noteOv && !noteOv.classList.contains('hidden')) return;
 
   // Horizontal
   if (keys.left) {
@@ -1192,13 +1196,23 @@ function updatePlayer() {
     if (hobgoblin.alive && hobgoblin.stunTimer <= 0) {
       const staffX = player.facing === 1 ? player.x + player.w : player.x - 30;
       const staffRect = { x: staffX, y: player.y + 8, w: 32, h: 20 };
-      if (aabbOverlap(staffRect, hobgoblin)) {
+      if (hobgoblin.alive && hobgoblin.invuln <= 0 && aabbOverlap(staffRect, hobgoblin)) {
+        hobgoblin.hp -= 1;
+        hobgoblin.invuln = 18;
         hobgoblin.vx = player.facing * 4;
         hobgoblin.vy = -3;
         score += 5;
         updateHUD();
         playSound('hit');
         spawnParticles(hobgoblin.x + hobgoblin.w / 2, hobgoblin.y + 20, 10, 'hit');
+        if (hobgoblin.hp <= 0) {
+          hobgoblin.alive = false;
+          score += 50;
+          playSound('skeletonDie');
+          spawnParticles(hobgoblin.x + hobgoblin.w / 2, hobgoblin.y + 20, 20, 'break');
+          tryDropPotion(hobgoblin.x + hobgoblin.w / 2, hobgoblin.y + 10);
+          updateHUD();
+        }
       }
       // Ataque em esqueletos
       for (const sk of skeletons) {
@@ -1468,6 +1482,7 @@ function updateBoneDragon() {
 
 function updateHobgoblin() {
   if (!hobgoblin.alive || gameState !== 'playing') return;
+  if (hobgoblin.invuln > 0) hobgoblin.invuln--;
 
   // Stun
   if (hobgoblin.stunTimer > 0) {
@@ -1592,8 +1607,30 @@ function updateNote() {
     score += 100;
     updateHUD();
     playSound('unlock');
-    showMessage("Você encontrou um bilhete antigo!\n\"Há uma ruína escondida nas profundezas da floresta...\nO Hobgoblin era apenas o guardião da entrada da vila.\"\n\nSiga para a direita → a Ruína aguarda.");
+    openNoteReading(
+      "Há uma ruína inexplorada na floresta.\n\n" +
+      "Siga para o leste, além da vila. O Hobgoblin guarda apenas a entrada — " +
+      "o verdadeiro perigo espera nas profundezas.\n\n" +
+      "Vá até lá."
+    );
   }
+}
+
+function openNoteReading(text) {
+  const overlay = document.getElementById('noteOverlay');
+  const noteText = document.getElementById('noteText');
+  if (!overlay || !noteText) {
+    showMessage(text);
+    return;
+  }
+  noteText.textContent = text;
+  overlay.classList.remove('hidden');
+}
+
+function closeNoteReading() {
+  const overlay = document.getElementById('noteOverlay');
+  if (overlay) overlay.classList.add('hidden');
+  showMessage("Siga para a direita → a Ruína aguarda além da vila.");
 }
 
 function takeDamage(amount) {
@@ -1669,6 +1706,7 @@ function spawnMutant(x) {
     facing: -1,
     type,
     hp: 1 + Math.floor(ashIntensity / 2),
+    maxHp: 1 + Math.floor(ashIntensity / 2),
     invuln: 0,
     attackCooldown: 0,
     animFrame: 0,
@@ -2069,8 +2107,10 @@ function resetGame() {
   hobgoblin.stunTimer = 0;
   hobgoblin.attackTimer = 0;
   hobgoblin.attackCooldown = 0;
+  hobgoblin.invuln = 0;
+  hobgoblin.maxHp = Math.max(4, Math.round(8 * d.enemyHpMult));
+  hobgoblin.hp = hobgoblin.maxHp;
   hobgoblin.alive = true;
-  // Ajusta velocidade do hobgoblin pela dificuldade
   hobgoblin.speed = 2.4 * d.enemySpeedMult;
 
   applyDifficultyToDragon();
@@ -2127,6 +2167,12 @@ function showMainMenu() {
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('overlay').classList.add('hidden');
   document.getElementById('messageBox').classList.add('hidden');
+  const noteOv = document.getElementById('noteOverlay');
+  if (noteOv) noteOv.classList.add('hidden');
+  const rp = document.getElementById('recordsPanel');
+  const cp = document.getElementById('controlsPanel');
+  if (rp) rp.classList.add('hidden');
+  if (cp) cp.classList.add('hidden');
   updateMenuSaveUI();
   applyPreferredDifficulty();
   refreshContinueButton();
@@ -2147,16 +2193,14 @@ document.querySelectorAll('.diff-btn').forEach(btn => {
 document.getElementById('startBtn').addEventListener('click', () => {
   initAudio();
   savePreferredDifficulty();
-  clearProgressCheckpoint(); // nova aventura = descarta checkpoint antigo
+  clearProgressCheckpoint();
   resetGame();
 });
 
 document.getElementById('continueBtn').addEventListener('click', async () => {
   initAudio();
   const snap = await loadProgressCheckpoint();
-  if (snap) {
-    await restoreFromCheckpoint(snap);
-  }
+  if (snap) await restoreFromCheckpoint(snap);
 });
 
 document.getElementById('menuBtn').addEventListener('click', () => {
@@ -2171,28 +2215,112 @@ document.getElementById('clearSaveBtn').addEventListener('click', async () => {
   }
 });
 
+// Submenus do menu principal
+const recordsBtn = document.getElementById('recordsBtn');
+const controlsBtn = document.getElementById('controlsBtn');
+const closeRecordsBtn = document.getElementById('closeRecordsBtn');
+const closeControlsBtn = document.getElementById('closeControlsBtn');
+const closeNoteBtn = document.getElementById('closeNoteBtn');
+
+if (recordsBtn) {
+  recordsBtn.addEventListener('click', () => {
+    document.getElementById('recordsPanel').classList.remove('hidden');
+    refreshRecentRunsUI();
+    updateMenuSaveUI();
+  });
+}
+if (closeRecordsBtn) {
+  closeRecordsBtn.addEventListener('click', () => {
+    document.getElementById('recordsPanel').classList.add('hidden');
+  });
+}
+if (controlsBtn) {
+  controlsBtn.addEventListener('click', () => {
+    document.getElementById('controlsPanel').classList.remove('hidden');
+  });
+}
+if (closeControlsBtn) {
+  closeControlsBtn.addEventListener('click', () => {
+    document.getElementById('controlsPanel').classList.add('hidden');
+  });
+}
+if (closeNoteBtn) {
+  closeNoteBtn.addEventListener('click', () => closeNoteReading());
+}
+
 // ------------------ Desenho (pixel art simples) ------------------
 function drawBackground() {
-  // Céu muda conforme a área
   if (cameraX < 2500) {
-    // Bosque - céu azul limpo
+    // Céu azul
     const grad = ctx.createLinearGradient(0, 0, 0, H);
     grad.addColorStop(0, '#5dade2');
-    grad.addColorStop(0.6, '#87ceeb');
-    grad.addColorStop(1, '#b8e0f0');
+    grad.addColorStop(0.55, '#87ceeb');
+    grad.addColorStop(1, '#c8e6c9');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    drawCloud(180 - cameraX * 0.3, 60, 1.2);
-    drawCloud(480 - cameraX * 0.25, 90, 0.9);
-    drawCloud(780 - cameraX * 0.35, 50, 1.4);
-    drawCloud(1100 - cameraX * 0.2, 80, 1.0);
+    // Montanha ao fundo (parallax bem lento, fixa no horizonte)
+    const mx = -cameraX * 0.08;
+    ctx.fillStyle = '#7b8fa1';
+    ctx.beginPath();
+    ctx.moveTo(mx - 40, 420);
+    ctx.lineTo(mx + 180, 160);
+    ctx.lineTo(mx + 320, 300);
+    ctx.lineTo(mx + 480, 140);
+    ctx.lineTo(mx + 700, 280);
+    ctx.lineTo(mx + 900, 150);
+    ctx.lineTo(mx + 1100, 420);
+    ctx.closePath();
+    ctx.fill();
+    // Neve no pico
+    ctx.fillStyle = '#e8eef5';
+    ctx.beginPath();
+    ctx.moveTo(mx + 160, 185);
+    ctx.lineTo(mx + 180, 160);
+    ctx.lineTo(mx + 205, 185);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(mx + 460, 165);
+    ctx.lineTo(mx + 480, 140);
+    ctx.lineTo(mx + 505, 165);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(mx + 880, 175);
+    ctx.lineTo(mx + 900, 150);
+    ctx.lineTo(mx + 925, 175);
+    ctx.closePath();
+    ctx.fill();
 
-    for (let i = 0; i < 14; i++) {
-      const tx = i * 220 - cameraX * 0.5;
-      drawTree(tx, 320, 0.7 + (i % 3) * 0.15);
+    // Segunda faixa de colinas
+    ctx.fillStyle = '#6b9b6e';
+    ctx.beginPath();
+    ctx.moveTo(0, 430);
+    for (let i = 0; i <= 12; i++) {
+      const hx = i * 90 - (cameraX * 0.15) % 90;
+      ctx.lineTo(hx, 400 + Math.sin(i * 0.9) * 18);
     }
+    ctx.lineTo(W + 20, 430);
+    ctx.lineTo(W + 20, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fill();
+
+    // Planície (faixa de grama no horizonte, sem árvores flutuando)
+    ctx.fillStyle = '#81c784';
+    ctx.fillRect(0, 440, W, 40);
+    ctx.fillStyle = '#66bb6a';
+    for (let i = 0; i < 30; i++) {
+      const gx = ((i * 40) - (cameraX * 0.2) % 40);
+      ctx.fillRect(gx, 448, 18, 4);
+    }
+
+    // Nuvens
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    drawCloud(180 - cameraX * 0.2, 55, 1.1);
+    drawCloud(520 - cameraX * 0.18, 85, 0.85);
+    drawCloud(820 - cameraX * 0.22, 45, 1.25);
   } else {
     // Ruína - céu sombrio
     const grad = ctx.createLinearGradient(0, 0, 0, H);
@@ -2202,7 +2330,6 @@ function drawBackground() {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
 
-    // Lua
     ctx.fillStyle = '#f5f5f5';
     ctx.beginPath();
     ctx.arc(W - 120, 70, 35, 0, Math.PI * 2);
@@ -2212,12 +2339,13 @@ function drawBackground() {
     ctx.arc(W - 105, 60, 30, 0, Math.PI * 2);
     ctx.fill();
 
-    // Pilares / ruínas de fundo
+    // Pilares no chão (alinhados ao horizonte)
     ctx.fillStyle = '#2c3e50';
     for (let i = 0; i < 10; i++) {
-      const px = 3000 + i * 200 - cameraX * 0.4;
-      ctx.fillRect(px, 200, 30, 280);
-      ctx.fillRect(px - 10, 190, 50, 15);
+      const px = 3000 + i * 200 - cameraX * 0.35;
+      if (px < -40 || px > W + 40) continue;
+      ctx.fillRect(px, 280, 28, 200);
+      ctx.fillRect(px - 8, 272, 44, 12);
     }
   }
 }
@@ -2231,22 +2359,19 @@ function drawCloud(x, y, scale) {
   ctx.fill();
 }
 
-function drawTree(x, y, scale) {
-  // Tronco
-  ctx.fillStyle = '#5d4037';
-  ctx.fillRect(x + 18 * scale, y, 14 * scale, 160 * scale);
-  // Copa
-  ctx.fillStyle = '#2e7d32';
-  ctx.beginPath();
-  ctx.arc(x + 25 * scale, y - 10 * scale, 40 * scale, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#388e3c';
-  ctx.beginPath();
-  ctx.arc(x + 10 * scale, y + 20 * scale, 32 * scale, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x + 42 * scale, y + 25 * scale, 30 * scale, 0, Math.PI * 2);
-  ctx.fill();
+/** Barra de vida acima de um mob */
+function drawHpBar(sx, sy, w, hp, maxHp) {
+  if (maxHp <= 0) return;
+  const bw = Math.max(w, 28);
+  const pct = Math.max(0, Math.min(1, hp / maxHp));
+  const bx = sx + (w - bw) / 2;
+  const by = sy - 10;
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillRect(bx - 1, by - 1, bw + 2, 7);
+  ctx.fillStyle = '#333';
+  ctx.fillRect(bx, by, bw, 5);
+  ctx.fillStyle = pct > 0.4 ? '#4caf50' : (pct > 0.2 ? '#ff9800' : '#f44336');
+  ctx.fillRect(bx, by, bw * pct, 5);
 }
 
 function drawPlatforms() {
@@ -2503,6 +2628,8 @@ function drawHobgoblin() {
   }
 
   ctx.restore();
+  // Barra de vida (fora do flip)
+  drawHpBar(hobgoblin.x - cameraX, hobgoblin.y, hobgoblin.w, hobgoblin.hp, hobgoblin.maxHp);
 }
 
 function drawSkeletons() {
@@ -2572,6 +2699,7 @@ function drawSkeletons() {
     }
 
     ctx.restore();
+    drawHpBar(sk.x - cameraX, sk.y, sk.w, sk.hp, sk.maxHp || sk.hp);
   }
 }
 
@@ -2857,13 +2985,15 @@ function drawGroundDrops() {
 }
 
 function drawCrow() {
-  // Corvo com monóculo numa árvore perto do Hobgoblin (~x 1480)
+  // Corvo com monóculo perto do Hobgoblin (~x 1480), asas batendo
   const treeX = 1480;
   const sx = treeX - cameraX;
   if (sx < -40 || sx > W + 40) return;
-  if (cameraX > 2500) return; // só no bosque/vila
+  if (cameraX > 2500) return;
 
   const cy = 250;
+  const flap = Math.sin(crowBlink * 0.35) * 5; // batida de asas
+
   // Corpo
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(sx + 8, cy, 16, 12);
@@ -2872,25 +3002,37 @@ function drawCrow() {
   // Bico
   ctx.fillStyle = '#f59e0b';
   ctx.fillRect(sx + 28, cy - 2, 6, 3);
-  // Asa
+
+  // Asa esquerda (sobe e desce)
   ctx.fillStyle = '#0a0a0a';
-  ctx.fillRect(sx + 6, cy + 2, 10, 8);
+  ctx.beginPath();
+  ctx.moveTo(sx + 10, cy + 4);
+  ctx.lineTo(sx - 2, cy + 2 - flap);
+  ctx.lineTo(sx + 8, cy + 10);
+  ctx.closePath();
+  ctx.fill();
+  // Asa direita
+  ctx.beginPath();
+  ctx.moveTo(sx + 20, cy + 4);
+  ctx.lineTo(sx + 34, cy + 1 - flap);
+  ctx.lineTo(sx + 22, cy + 10);
+  ctx.closePath();
+  ctx.fill();
+
   // Pés
   ctx.fillStyle = '#f59e0b';
   ctx.fillRect(sx + 10, cy + 12, 3, 5);
   ctx.fillRect(sx + 18, cy + 12, 3, 5);
-  // Monóculo (dourado)
+  // Monóculo
   ctx.strokeStyle = '#fbbf24';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.arc(sx + 24, cy - 2, 3.5, 0, Math.PI * 2);
   ctx.stroke();
-  // Brilho do monóculo / piscar
   if (Math.floor(crowBlink / 40) % 7 !== 0) {
     ctx.fillStyle = '#60a5fa';
     ctx.fillRect(sx + 23, cy - 3, 2, 2);
   }
-  // Corrente do monóculo
   ctx.strokeStyle = '#a8a29e';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -2970,6 +3112,7 @@ function drawMutants() {
     }
 
     ctx.restore();
+    drawHpBar(m.x - cameraX, m.y, m.w, m.hp, m.maxHp || m.hp);
   }
 }
 
